@@ -5,13 +5,17 @@ const orderSchema = new mongoose.Schema(
   {
     orderId: {
       type: String,
+      unique: true,
+    },
+    saleOrderId: {
+      type: String,
       required: true,
       trim: true,
     },
     status: {
       type: String,
       enum: Object.values(ORDER_STATUSES),
-      default: ORDER_STATUSES.PENDING,
+      default: ORDER_STATUSES.CREATED,
     },
     customerName: {
       type: String,
@@ -56,7 +60,7 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-orderSchema.index({ orgId: 1, orderId: 1 }, { unique: true });
+orderSchema.index({ orgId: 1, saleOrderId: 1 }, { unique: true });
 orderSchema.index({ orgId: 1, status: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

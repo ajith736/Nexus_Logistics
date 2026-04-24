@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Nexus API (server)",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/src/server.js",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "envFile": "${workspaceFolder}/.env",
+      "restart": false
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Nexus API (watch)",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--watch"],
+      "program": "${workspaceFolder}/src/server.js",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "envFile": "${workspaceFolder}/.env",
+      "restart": false
+    }
+  ]
+}

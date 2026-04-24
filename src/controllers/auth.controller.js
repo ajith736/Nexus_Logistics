@@ -22,7 +22,8 @@ function generateRefreshToken(payload) {
 
 async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const { password } = req.body;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
@@ -124,25 +125,40 @@ async function refreshAccessToken(req, res, next) {
 
 async function agentLogin(req, res, next) {
   try {
-    const { phone, pin, orgSlug } = req.body;
+    const phone = String(req.body.phone || '').trim();
+    const { pin } = req.body;
 
-    const org = await Organization.findOne({ slug: orgSlug });
+    const candidates = await Agent.find({ phone }).select('+pin');
+    if (!candidates.length) {
+      return error(res, 'Invalid phone or PIN', 401, 'INVALID_CREDENTIALS');
+    }
+
+    const pinMatches = [];
+    for (const a of candidates) {
+      if (await a.comparePin(pin)) pinMatches.push(a);
+    }
+
+    if (!pinMatches.length) {
+      return error(res, 'Invalid phone or PIN', 401, 'INVALID_CREDENTIALS');
+    }
+
+    if (pinMatches.length > 1) {
+      return error(
+        res,
+        'This phone is linked to more than one account with the same PIN — contact your dispatcher',
+        409,
+        'AMBIGUOUS_AGENT'
+      );
+    }
+
+    const agent = pinMatches[0];
+    const org = await Organization.findById(agent.orgId);
     if (!org) {
       return error(res, 'Organization not found', 404, 'ORG_NOT_FOUND');
     }
 
     if (org.status === ORG_STATUSES.SUSPENDED) {
       return error(res, 'Organization is suspended — contact your dispatcher', 403, 'ORG_SUSPENDED');
-    }
-
-    const agent = await Agent.findOne({ phone, orgId: org._id }).select('+pin');
-    if (!agent) {
-      return error(res, 'Invalid phone or PIN', 401, 'INVALID_CREDENTIALS');
-    }
-
-    const isMatch = await agent.comparePin(pin);
-    if (!isMatch) {
-      return error(res, 'Invalid phone or PIN', 401, 'INVALID_CREDENTIALS');
     }
 
     const tokenPayload = {

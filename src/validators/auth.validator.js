@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().trim().lowercase().email().required(),
   password: Joi.string().min(6).required(),
 });
 
@@ -10,9 +10,8 @@ const refreshTokenSchema = Joi.object({
 });
 
 const agentLoginSchema = Joi.object({
-  phone: Joi.string().required(),
+  phone: Joi.string().trim().required(),
   pin: Joi.string().length(4).required(),
-  orgSlug: Joi.string().required(),
 });
 
 module.exports = {

@@ -10,6 +10,10 @@ const { getRedisConnection, isRedisEnabled } = require('./config/redis');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
+const organizationRoutes = require('./routes/organization.routes');
+const userRoutes = require('./routes/user.routes');
+const agentRoutes = require('./routes/agent.routes');
+const orderRoutes = require('./routes/order.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +25,10 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/agents', agentRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.use(errorHandler);
 

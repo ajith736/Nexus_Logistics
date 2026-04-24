@@ -10,6 +10,7 @@ const AGENT_STATUSES = Object.freeze({
 });
 
 const ORDER_STATUSES = Object.freeze({
+  CREATED: 'created',
   PENDING: 'pending',
   ASSIGNED: 'assigned',
   OUT_FOR_DELIVERY: 'out_for_delivery',
