@@ -52,10 +52,6 @@ const orderSchema = new mongoose.Schema(
       ref: 'UploadJob',
       default: null,
     },
-    dedupeHash: {
-      type: String,
-      index: true,
-    },
   },
   { timestamps: true }
 );

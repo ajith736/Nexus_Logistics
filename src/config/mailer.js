@@ -2,6 +2,12 @@ const nodemailer = require('nodemailer');
 
 let transporter = null;
 
+function isMailConfigured() {
+  return Boolean(
+    String(process.env.MAIL_USER || '').trim() && String(process.env.MAIL_PASS || '').trim()
+  );
+}
+
 function getMailTransporter() {
   if (transporter) return transporter;
 
@@ -17,4 +23,4 @@ function getMailTransporter() {
   return transporter;
 }
 
-module.exports = { getMailTransporter };
+module.exports = { getMailTransporter, isMailConfigured };

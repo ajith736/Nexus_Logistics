@@ -7,6 +7,7 @@ const path = require('path');
 const { connectDB } = require('./config/db');
 const { initSocket } = require('./config/socket');
 const { getRedisConnection, isRedisEnabled } = require('./config/redis');
+const { startUploadWorker, closeUploadWorker } = require('./queues/upload.worker');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
@@ -14,6 +15,7 @@ const organizationRoutes = require('./routes/organization.routes');
 const userRoutes = require('./routes/user.routes');
 const agentRoutes = require('./routes/agent.routes');
 const orderRoutes = require('./routes/order.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +31,7 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 app.use(errorHandler);
 
@@ -41,8 +44,9 @@ async function startServer() {
 
     if (isRedisEnabled()) {
       getRedisConnection();
+      startUploadWorker();
     } else {
-      console.log('Redis disabled (REDIS_ENABLED=false) — BullMQ will be wired when you enable it.');
+      console.log('Redis disabled (REDIS_ENABLED=false) — BullMQ queues/workers will not start.');
     }
 
     server.listen(PORT, () => {
@@ -61,6 +65,12 @@ function gracefulShutdown(signal) {
       const mongoose = require('mongoose');
       await mongoose.connection.close();
       console.log('MongoDB connection closed');
+
+      try {
+        await closeUploadWorker();
+      } catch {
+        /* Worker may not be running */
+      }
 
       try {
         const redis = getRedisConnection();
