@@ -23,4 +23,14 @@ const updateOrderStatusSchema = Joi.object({
     .required(),
 });
 
-module.exports = { createOrderSchema, assignAgentSchema, updateOrderStatusSchema };
+const bulkAssignSchema = Joi.object({
+  orderIds: Joi.array().items(Joi.string().hex().length(24)).min(1).max(200).required(),
+  agentId: Joi.string().hex().length(24).required(),
+});
+
+module.exports = {
+  createOrderSchema,
+  assignAgentSchema,
+  updateOrderStatusSchema,
+  bulkAssignSchema,
+};

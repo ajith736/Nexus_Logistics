@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-input: hsl(214.3 31.8% 91.4%);
+  --color-ring: hsl(221.2 83.2% 53.3%);
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-primary: hsl(221.2 83.2% 53.3%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-secondary: hsl(210 40% 96.1%);
+  --color-secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --color-muted: hsl(210 40% 96.1%);
+  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-accent: hsl(210 40% 96.1%);
+  --color-accent-foreground: hsl(222.2 47.4% 11.2%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(210 40% 98%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222.2 84% 4.9%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222.2 84% 4.9%);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* ─── Dark mode global overrides ─────────────────────────────────────────── */
+/* These cover the bg-white / bg-gray-* / border-gray-* patterns used
+   throughout every page without needing dark: on every element. */
+
+.dark {
+  --color-background: hsl(222 47% 7%);
+  --color-foreground: hsl(213 31% 91%);
+  --color-border: hsl(216 34% 17%);
+  --color-input: hsl(216 34% 17%);
+  --color-card: hsl(222 47% 11%);
+  --color-card-foreground: hsl(213 31% 91%);
+  --color-popover: hsl(222 47% 11%);
+  --color-popover-foreground: hsl(213 31% 91%);
+  --color-muted: hsl(223 47% 14%);
+  --color-muted-foreground: hsl(215 20% 55%);
+  --color-secondary: hsl(222 47% 14%);
+  --color-secondary-foreground: hsl(213 31% 91%);
+  --color-accent: hsl(222 47% 14%);
+  --color-accent-foreground: hsl(213 31% 91%);
+}
+
+/* Page/layout backgrounds */
+.dark .bg-gray-50  { background-color: hsl(222 47% 7%) !important; }
+.dark .bg-white    { background-color: hsl(222 47% 11%) !important; }
+.dark .bg-gray-100 { background-color: hsl(222 47% 14%) !important; }
+.dark .bg-gray-200 { background-color: hsl(222 47% 18%) !important; }
+
+/* Borders */
+.dark .border-gray-100 { border-color: hsl(216 34% 14%) !important; }
+.dark .border-gray-200 { border-color: hsl(216 34% 17%) !important; }
+.dark .divide-gray-100 > * + * { border-color: hsl(216 34% 14%) !important; }
+.dark .divide-gray-200 > * + * { border-color: hsl(216 34% 17%) !important; }
+.dark .divide-gray-50  > * + * { border-color: hsl(216 34% 12%) !important; }
+
+/* Text */
+.dark .text-gray-900 { color: hsl(213 31% 91%) !important; }
+.dark .text-gray-800 { color: hsl(213 31% 85%) !important; }
+.dark .text-gray-700 { color: hsl(215 20% 75%) !important; }
+.dark .text-gray-600 { color: hsl(215 20% 65%) !important; }
+.dark .text-gray-500 { color: hsl(215 20% 55%) !important; }
+.dark .text-gray-400 { color: hsl(215 16% 45%) !important; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover  { background-color: hsl(222 47% 14%) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: hsl(222 47% 16%) !important; }
+
+/* Table / DataTable */
+.dark thead.bg-gray-50,
+.dark .bg-gray-50.rounded-lg { background-color: hsl(222 47% 9%) !important; }
+
+/* Inputs */
+.dark input[type="date"],
+.dark input[type="text"],
+.dark input[type="password"],
+.dark input[type="email"],
+.dark input[type="tel"],
+.dark textarea {
+  background-color: hsl(222 47% 11%);
+  color: hsl(213 31% 91%);
+  border-color: hsl(216 34% 22%);
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Select / Radix dropdowns */
+.dark [data-radix-select-viewport],
+.dark [role="listbox"] {
+  background-color: hsl(222 47% 11%);
+  border-color: hsl(216 34% 17%);
+}
+
+/* Alert dialogs / Modals */
+.dark [role="alertdialog"],
+.dark [role="dialog"] {
+  background-color: hsl(222 47% 11%);
+  border-color: hsl(216 34% 17%);
+  color: hsl(213 31% 91%);
+}
+
+/* Skeleton pulses */
+.dark .animate-pulse { background-color: hsl(222 47% 16%) !important; }
+
+/* Scrollbar in dark mode */
+.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dark ::-webkit-scrollbar-track { background: hsl(222 47% 9%); }
+.dark ::-webkit-scrollbar-thumb { background: hsl(216 34% 25%); border-radius: 3px; }
