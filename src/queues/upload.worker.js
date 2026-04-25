@@ -3,6 +3,7 @@ const { getRedisConnection, isRedisEnabled } = require('../config/redis');
 const { parseCSV, validateRow, generateErrorCSV } = require('../services/csv.service');
 const { getAbsolutePath, getFileUrl } = require('../services/storage.service');
 const { sendUploadReport } = require('../services/email.service');
+const { emitToOrg } = require('../config/socket');
 const Order = require('../models/Order');
 const Counter = require('../models/Counter');
 const UploadJob = require('../models/UploadJob');
@@ -12,19 +13,6 @@ const { UPLOAD_STATUSES, ORDER_STATUSES } = require('../utils/constants');
 const { QUEUE_NAME } = require('./upload.queue');
 
 const PROGRESS_INTERVAL = 50;
-
-let ioGetter = null;
-function emitToOrg(orgId, event, data) {
-  try {
-    if (!ioGetter) {
-      ioGetter = require('../config/socket').getIO;
-    }
-    const io = ioGetter();
-    io.to(`org:${orgId}`).emit(event, data);
-  } catch {
-    /* Socket.io may not be available in worker context */
-  }
-}
 
 async function processUploadJob(job) {
   const { uploadJobId, filePath, orgId, uploadedBy } = job.data;

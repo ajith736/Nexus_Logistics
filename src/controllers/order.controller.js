@@ -5,6 +5,8 @@ const OrderStatusLog = require('../models/OrderStatusLog');
 const { success, paginated, error } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
 const { ORDER_STATUSES, AGENT_STATUSES } = require('../utils/constants');
+const { emitToOrg } = require('../config/socket');
+const { logAudit } = require('../services/audit.service');
 
 const VALID_TRANSITIONS = {
   [ORDER_STATUSES.CREATED]: [ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.FAILED],
@@ -39,6 +41,14 @@ async function createOrder(req, res, next) {
       toStatus: ORDER_STATUSES.CREATED,
       changedBy: req.user.id,
       changedByModel: 'User',
+    });
+
+    logAudit({
+      action: 'order.created',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId,
+      metadata: { orderId: order.orderId },
     });
 
     return success(res, order, 'Order created', 201);
@@ -143,6 +153,21 @@ async function assignAgent(req, res, next) {
 
     const populated = await Order.findById(order._id)
       .populate('assignedTo', 'name phone');
+
+    emitToOrg(orgId, 'order:statusChanged', {
+      orderId: order.orderId,
+      newStatus: ORDER_STATUSES.ASSIGNED,
+      agentName: agent.name,
+    });
+
+    logAudit({
+      action: 'order.agentAssigned',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId,
+      metadata: { orderId: order.orderId, agentId: String(agent._id), agentName: agent.name },
+    });
+
     return success(res, populated, 'Agent assigned to order');
   } catch (err) {
     next(err);
@@ -193,6 +218,26 @@ async function updateOrderStatus(req, res, next) {
       toStatus: newStatus,
       changedBy: req.user.id,
       changedByModel,
+    });
+
+    let agentName = null;
+    if (order.assignedTo) {
+      const assignedAgent = await Agent.findById(order.assignedTo).lean();
+      agentName = assignedAgent?.name || null;
+    }
+
+    emitToOrg(orgId, 'order:statusChanged', {
+      orderId: order.orderId,
+      newStatus,
+      agentName,
+    });
+
+    logAudit({
+      action: 'order.statusChanged',
+      performedBy: req.user.id,
+      performedByModel: changedByModel,
+      orgId,
+      metadata: { orderId: order.orderId, fromStatus: previousStatus, toStatus: newStatus },
     });
 
     return success(res, order, 'Order status updated');

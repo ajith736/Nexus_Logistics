@@ -2,6 +2,7 @@ const Organization = require('../models/Organization');
 const { success, paginated, error } = require('../utils/apiResponse');
 const { generateSlug } = require('../utils/slugify');
 const { parsePagination } = require('../utils/pagination');
+const { logAudit } = require('../services/audit.service');
 
 async function createOrg(req, res, next) {
   try {
@@ -9,6 +10,14 @@ async function createOrg(req, res, next) {
     const slug = generateSlug(name);
 
     const org = await Organization.create({ name, slug });
+
+    logAudit({
+      action: 'organization.created',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId: org._id,
+      metadata: { name: org.name, slug: org.slug },
+    });
 
     return success(res, org, 'Organization created', 201);
   } catch (err) {
@@ -60,6 +69,14 @@ async function updateOrg(req, res, next) {
     );
 
     if (!org) return error(res, 'Organization not found', 404, 'NOT_FOUND');
+
+    logAudit({
+      action: 'organization.updated',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId: org._id,
+      metadata: { updates: Object.keys(req.body) },
+    });
 
     return success(res, org, 'Organization updated');
   } catch (err) {

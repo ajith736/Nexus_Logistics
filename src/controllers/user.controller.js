@@ -3,6 +3,7 @@ const Organization = require('../models/Organization');
 const { success, paginated, error } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
 const { ROLES } = require('../utils/constants');
+const { logAudit } = require('../services/audit.service');
 
 async function createUser(req, res, next) {
   try {
@@ -17,6 +18,14 @@ async function createUser(req, res, next) {
       password,
       role: ROLES.DISPATCHER,
       orgId,
+    });
+
+    logAudit({
+      action: 'user.created',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId,
+      metadata: { userId: String(user._id), email: user.email, role: user.role },
     });
 
     return success(res, {
@@ -102,6 +111,14 @@ async function deleteUser(req, res, next) {
     user.isActive = false;
     user.refreshToken = null;
     await user.save({ validateModifiedOnly: true });
+
+    logAudit({
+      action: 'user.deactivated',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId: user.orgId,
+      metadata: { userId: String(user._id), email: user.email },
+    });
 
     return success(res, null, 'User deactivated');
   } catch (err) {

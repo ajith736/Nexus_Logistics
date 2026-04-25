@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 
 let io = null;
 
@@ -10,8 +11,30 @@ function initSocket(httpServer) {
     },
   });
 
+  io.use((socket, next) => {
+    const token =
+      socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+
+    if (!token) {
+      return next(new Error('Authentication required — provide a token in auth.token'));
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.user = decoded;
+      next();
+    } catch {
+      next(new Error('Invalid or expired token'));
+    }
+  });
+
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    const { id, role, orgId } = socket.user;
+    console.log(`Socket connected: ${socket.id} (user=${id}, role=${role})`);
+
+    if (orgId) {
+      socket.join(`org:${orgId}`);
+    }
 
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
@@ -26,4 +49,17 @@ function getIO() {
   return io;
 }
 
-module.exports = { initSocket, getIO };
+/**
+ * Safely emit an event to all sockets in an org room.
+ * Returns silently if Socket.io is not initialized.
+ */
+function emitToOrg(orgId, event, data) {
+  try {
+    const server = getIO();
+    server.to(`org:${orgId}`).emit(event, data);
+  } catch {
+    /* Socket.io may not be initialized */
+  }
+}
+
+module.exports = { initSocket, getIO, emitToOrg };

@@ -1,6 +1,8 @@
 const Agent = require('../models/Agent');
 const { success, paginated, error } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
+const { emitToOrg } = require('../config/socket');
+const { logAudit } = require('../services/audit.service');
 
 async function createAgent(req, res, next) {
   try {
@@ -8,6 +10,14 @@ async function createAgent(req, res, next) {
     const orgId = req.user.orgId;
 
     const agent = await Agent.create({ name, phone, pin, orgId });
+
+    logAudit({
+      action: 'agent.created',
+      performedBy: req.user.id,
+      performedByModel: 'User',
+      orgId,
+      metadata: { agentId: String(agent._id), agentName: agent.name },
+    });
 
     return success(res, {
       id: agent._id,
@@ -86,6 +96,20 @@ async function toggleStatus(req, res, next) {
     );
 
     if (!agent) return error(res, 'Agent not found', 404, 'NOT_FOUND');
+
+    emitToOrg(req.user.orgId, 'agent:statusChanged', {
+      agentId: agent._id,
+      newStatus: agent.status,
+    });
+
+    const performerModel = req.user.role === 'agent' ? 'Agent' : 'User';
+    logAudit({
+      action: 'agent.statusChanged',
+      performedBy: req.user.id,
+      performedByModel: performerModel,
+      orgId: req.user.orgId,
+      metadata: { agentId: String(agent._id), newStatus: agent.status },
+    });
 
     return success(res, agent, 'Agent status updated');
   } catch (err) {

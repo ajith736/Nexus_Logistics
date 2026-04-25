@@ -5,7 +5,7 @@ const cors = require('cors');
 const path = require('path');
 
 const { connectDB } = require('./config/db');
-const { initSocket } = require('./config/socket');
+const { initSocket, getIO } = require('./config/socket');
 const { getRedisConnection, isRedisEnabled } = require('./config/redis');
 const { startUploadWorker, closeUploadWorker } = require('./queues/upload.worker');
 const errorHandler = require('./middleware/errorHandler');
@@ -62,9 +62,14 @@ function gracefulShutdown(signal) {
   console.log(`\n${signal} received — shutting down gracefully...`);
   server.close(async () => {
     try {
-      const mongoose = require('mongoose');
-      await mongoose.connection.close();
-      console.log('MongoDB connection closed');
+      try {
+        const io = getIO();
+        io.disconnectSockets(true);
+        io.close();
+        console.log('Socket.io server closed');
+      } catch {
+        /* Socket.io may not be initialized */
+      }
 
       try {
         await closeUploadWorker();
@@ -73,14 +78,20 @@ function gracefulShutdown(signal) {
       }
 
       try {
-        const redis = getRedisConnection();
-        if (redis) {
-          await redis.quit();
-          console.log('Redis connection closed');
+        if (isRedisEnabled()) {
+          const redis = getRedisConnection();
+          if (redis) {
+            await redis.quit();
+            console.log('Redis connection closed');
+          }
         }
       } catch {
         /* Redis may not be connected */
       }
+
+      const mongoose = require('mongoose');
+      await mongoose.connection.close();
+      console.log('MongoDB connection closed');
 
       console.log('Shutdown complete');
       process.exit(0);
