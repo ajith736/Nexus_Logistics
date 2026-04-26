@@ -9,6 +9,7 @@ const { initSocket, getIO } = require('./config/socket');
 const { getRedisConnection, isRedisEnabled } = require('./config/redis');
 const { startUploadWorker, closeUploadWorker } = require('./queues/upload.worker');
 const errorHandler = require('./middleware/errorHandler');
+const { generalLimiter } = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health.routes');
 const authRoutes = require('./routes/auth.routes');
 const organizationRoutes = require('./routes/organization.routes');
@@ -24,6 +25,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+app.use('/api', generalLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);

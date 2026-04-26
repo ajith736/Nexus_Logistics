@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { bulkAssignLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const {
   createOrderSchema,
@@ -27,6 +28,7 @@ router.get('/stats', requireRole(ROLES.DISPATCHER), orderStats);
 router.post(
   '/bulk-assign',
   requireRole(ROLES.DISPATCHER),
+  bulkAssignLimiter,
   validate(bulkAssignSchema),
   bulkAssignAgent
 );
