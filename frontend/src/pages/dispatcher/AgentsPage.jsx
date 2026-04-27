@@ -43,6 +43,7 @@ export default function AgentsPage() {
   }, [queryClient]);
 
   useSocket('agent:statusChanged', handleSocketEvent);
+  const getDisplayStatus = (agent) => agent.displayStatus || agent.status;
 
   const columns = [
     {
@@ -58,7 +59,7 @@ export default function AgentsPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <AgentStatusBadge status={row.status} />,
+      render: (row) => <AgentStatusBadge status={getDisplayStatus(row)} />,
     },
     {
       key: 'createdAt',
@@ -67,9 +68,9 @@ export default function AgentsPage() {
     },
   ];
 
-  const available = agents.filter((a) => a.status === 'available').length;
-  const busy = agents.filter((a) => a.status === 'busy').length;
-  const offline = agents.filter((a) => a.status === 'unavailable').length;
+  const available = agents.filter((a) => getDisplayStatus(a) === 'available').length;
+  const busy = agents.filter((a) => getDisplayStatus(a) === 'busy').length;
+  const offline = agents.filter((a) => getDisplayStatus(a) === 'unavailable').length;
 
   return (
     <div>

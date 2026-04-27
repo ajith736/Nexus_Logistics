@@ -336,6 +336,30 @@ async function updateOrderStatus(req, res, next) {
       metadata: { orderId: order.orderId, fromStatus: previousStatus, toStatus: newStatus },
     });
 
+    if (
+      order.assignedTo &&
+      (newStatus === ORDER_STATUSES.DELIVERED || newStatus === ORDER_STATUSES.FAILED)
+    ) {
+      const stillActive = await Order.countDocuments({
+        orgId,
+        assignedTo: order.assignedTo,
+        status: { $in: [ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.OUT_FOR_DELIVERY] },
+      });
+      if (stillActive === 0) {
+        const cleared = await Agent.findOneAndUpdate(
+          { _id: order.assignedTo, orgId, status: AGENT_STATUSES.BUSY },
+          { status: AGENT_STATUSES.AVAILABLE },
+          { new: true }
+        );
+        if (cleared) {
+          emitToOrg(orgId, 'agent:statusChanged', {
+            agentId: cleared._id,
+            newStatus: cleared.status,
+          });
+        }
+      }
+    }
+
     return success(res, order, 'Order status updated');
   } catch (err) {
     next(err);

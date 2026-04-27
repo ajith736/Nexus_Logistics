@@ -1,9 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Package, LogOut, Truck, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/auth.store';
 import { agentsApi } from '@/api/agents.api';
+import { ordersApi } from '@/api/orders.api';
 import { cn } from '@/lib/utils';
 
 const agentNav = [
@@ -15,6 +16,14 @@ function AvailabilityToggle() {
   const patchUser = useAuthStore((s) => s.patchUser);
   const status = user?.status;
 
+  const { data: activeOrdersData } = useQuery({
+    queryKey: ['my-orders', 'active'],
+    queryFn: () => ordersApi.myActiveOrders(),
+    enabled: !!user,
+  });
+  const activeCount = activeOrdersData?.data?.data?.length ?? 0;
+  const isOnDelivery = activeCount > 0;
+
   const mutation = useMutation({
     mutationFn: (newStatus) => agentsApi.toggleStatus(user.id, newStatus),
     onSuccess: (_, newStatus) => patchUser({ status: newStatus }),
@@ -22,7 +31,7 @@ function AvailabilityToggle() {
 
   if (!status) return null;
 
-  if (status === 'busy') {
+  if (isOnDelivery) {
     return (
       <div className="flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1">
         <Truck className="h-3.5 w-3.5 text-amber-300" />
@@ -31,7 +40,7 @@ function AvailabilityToggle() {
     );
   }
 
-  const isAvailable = status === 'available';
+  const isAvailable = status === 'available' || status === 'busy';
 
   return (
     <button

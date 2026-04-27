@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Agent = require('../models/Agent');
+const Order = require('../models/Order');
 const { success, paginated, error } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
 const { emitToOrg } = require('../config/socket');
@@ -36,14 +38,79 @@ async function listAgents(req, res, next) {
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const orgId = req.user.orgId;
+    const orgObjectId = new mongoose.Types.ObjectId(String(orgId));
+    const requestedStatus = req.query.status;
+    const activeOrderStatuses = ['assigned', 'out_for_delivery'];
+
+    // "busy" is derived from active orders, not persisted on Agent.
+    if (requestedStatus === 'busy') {
+      const allAgents = await Agent.find({ orgId }).sort({ createdAt: -1 }).lean();
+      const agentIds = allAgents.map((a) => a._id);
+
+      const activeCounts = agentIds.length
+        ? await Order.aggregate([
+          {
+            $match: {
+              orgId: orgObjectId,
+              assignedTo: { $in: agentIds },
+              status: { $in: activeOrderStatuses },
+            },
+          },
+          { $group: { _id: '$assignedTo', count: { $sum: 1 } } },
+        ])
+        : [];
+
+      const countMap = new Map(activeCounts.map((r) => [String(r._id), r.count]));
+      const busyAgents = allAgents
+        .map((a) => {
+          const activeOrdersCount = countMap.get(String(a._id)) || 0;
+          const baseStatus = a.status === 'busy' ? 'available' : a.status;
+          return {
+            ...a,
+            activeOrdersCount,
+            displayStatus: activeOrdersCount > 0 ? 'busy' : baseStatus,
+          };
+        })
+        .filter((a) => a.displayStatus === 'busy');
+
+      const docs = busyAgents.slice(skip, skip + limit);
+      return paginated(res, { docs, total: busyAgents.length, page, limit });
+    }
+
     const filter = { orgId };
+    if (requestedStatus === 'available' || requestedStatus === 'unavailable') {
+      filter.status = requestedStatus;
+    }
 
-    if (req.query.status) filter.status = req.query.status;
-
-    const [docs, total] = await Promise.all([
-      Agent.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    const [agents, total] = await Promise.all([
+      Agent.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Agent.countDocuments(filter),
     ]);
+
+    const agentIds = agents.map((a) => a._id);
+    const activeCounts = agentIds.length
+      ? await Order.aggregate([
+        {
+          $match: {
+            orgId: orgObjectId,
+            assignedTo: { $in: agentIds },
+            status: { $in: activeOrderStatuses },
+          },
+        },
+        { $group: { _id: '$assignedTo', count: { $sum: 1 } } },
+      ])
+      : [];
+
+    const countMap = new Map(activeCounts.map((r) => [String(r._id), r.count]));
+    const docs = agents.map((a) => {
+      const activeOrdersCount = countMap.get(String(a._id)) || 0;
+      const baseStatus = a.status === 'busy' ? 'available' : a.status;
+      return {
+        ...a,
+        activeOrdersCount,
+        displayStatus: activeOrdersCount > 0 ? 'busy' : baseStatus,
+      };
+    });
 
     return paginated(res, { docs, total, page, limit });
   } catch (err) {
