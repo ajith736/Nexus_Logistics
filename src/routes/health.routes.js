@@ -5,6 +5,53 @@ const { getUploadQueue } = require('../queues/upload.queue');
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: Health check
+ *     description: No authentication required. Returns 503 if MongoDB is disconnected.
+ *     responses:
+ *       200:
+ *         description: All services healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 uptime:
+ *                   type: number
+ *                   description: Process uptime in seconds
+ *                 services:
+ *                   type: object
+ *                   properties:
+ *                     mongodb:
+ *                       type: string
+ *                       example: connected
+ *                     redis:
+ *                       type: string
+ *                       example: connected
+ *                     queue:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         waiting:
+ *                           type: integer
+ *                         active:
+ *                           type: integer
+ *                         delayed:
+ *                           type: integer
+ *       503:
+ *         description: MongoDB is disconnected
+ */
 router.get('/', async (_req, res) => {
   const mongoStatus =
     mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';

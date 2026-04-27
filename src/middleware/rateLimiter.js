@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = rateLimit;
 
 function rateLimitBody(message) {
   return {
@@ -36,7 +37,7 @@ const uploadCsvLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitBody('Too many file uploads, please try again in a few minutes'),
-  keyGenerator: (req) => (req.user?.id ? String(req.user.id) : req.ip),
+  keyGenerator: (req) => (req.user?.id ? String(req.user.id) : ipKeyGenerator(req)),
 });
 
 /** Bulk assign touches many orders per request — tighter than general API. */
@@ -46,7 +47,7 @@ const bulkAssignLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitBody('Too many bulk assign requests, please try again later'),
-  keyGenerator: (req) => (req.user?.id ? String(req.user.id) : req.ip),
+  keyGenerator: (req) => (req.user?.id ? String(req.user.id) : ipKeyGenerator(req)),
 });
 
 module.exports = {

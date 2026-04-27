@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 const { connectDB } = require('./config/db');
 const { initSocket, getIO } = require('./config/socket');
@@ -25,6 +27,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Nexus Logistics API Docs',
+    swaggerOptions: { persistAuthorization: true, docExpansion: 'list', filter: true },
+  })
+);
 
 app.use('/api', generalLimiter);
 
