@@ -13,6 +13,7 @@ const router = Router();
  *       - Health
  *     summary: Health check
  *     description: No authentication required. Returns 503 if MongoDB is disconnected.
+ *     security: []
  *     responses:
  *       200:
  *         description: All services healthy
