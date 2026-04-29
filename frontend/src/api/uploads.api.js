@@ -14,5 +14,7 @@ export const uploadsApi = {
 
   get: (id) => api.get(`/uploads/${id}`),
 
+  getErrorUrl: (id) => api.get(`/uploads/${id}/error-url`),
+
   downloadSample: () => api.get('/uploads/sample', { responseType: 'blob' }),
 };

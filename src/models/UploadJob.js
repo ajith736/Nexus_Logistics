@@ -32,6 +32,19 @@ const uploadJobSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    storageProvider: {
+      type: String,
+      enum: ['local', 's3'],
+      default: 'local',
+    },
+    fileKey: {
+      type: String,
+      default: null,
+    },
+    errorFileKey: {
+      type: String,
+      default: null,
+    },
     orgId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',

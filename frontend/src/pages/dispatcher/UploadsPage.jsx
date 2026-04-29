@@ -128,6 +128,13 @@ export default function UploadsPage() {
   useSocket('upload:progress', handleProgress);
   useSocket('upload:complete', handleComplete);
 
+  const openErrorReport = useCallback(async (jobId) => {
+    if (!jobId) return;
+    const res = await uploadsApi.getErrorUrl(jobId);
+    const url = res?.data?.data?.url;
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
   // Drag & drop handlers
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -237,16 +244,18 @@ export default function UploadsPage() {
       key: 'actions',
       header: '',
       render: (row) =>
-        row.errorFileUrl ? (
-          <a
-            href={row.errorFileUrl}
-            download
+        row.errorFileUrl || row.errorFileKey ? (
+          <button
+            type="button"
             className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 hover:underline font-medium whitespace-nowrap"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              openErrorReport(row._id);
+            }}
           >
             <Download className="h-3.5 w-3.5" />
             Error CSV
-          </a>
+          </button>
         ) : null,
     },
   ];
@@ -412,15 +421,15 @@ export default function UploadsPage() {
                 )}
                 .
               </p>
-              {activeJob.errorFileUrl && (
-                <a
-                  href={activeJob.errorFileUrl}
-                  download
+              {(activeJob.errorFileUrl || activeJob.errorFileKey) && (
+                <button
+                  type="button"
+                  onClick={() => openErrorReport(activeJob.jobId)}
                   className="mt-1 inline-flex items-center gap-1 text-red-600 hover:text-red-800 hover:underline font-medium"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Download error report
-                </a>
+                </button>
               )}
             </div>
           </div>
