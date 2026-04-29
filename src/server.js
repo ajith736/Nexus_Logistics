@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const { getAllowedOrigins } = require('./config/origins');
 
 const { connectDB } = require('./config/db');
 const { initSocket, getIO } = require('./config/socket');
@@ -22,8 +23,19 @@ const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = getAllowedOrigins();
 
-app.use(cors());
+app.set('trust proxy', 1);
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error('CORS origin not allowed'));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

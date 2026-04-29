@@ -124,6 +124,12 @@ async function processUploadJob(job) {
   try {
     const uploader = await User.findById(uploadedBy).lean();
     if (uploader?.email) {
+      const downloadBaseUrl = (
+        process.env.PUBLIC_API_URL ||
+        process.env.SERVER_URL ||
+        'http://localhost:5000'
+      ).replace(/\/+$/, '');
+
       await sendUploadReport({
         to: uploader.email,
         originalName: uploadJob.originalName,
@@ -131,7 +137,7 @@ async function processUploadJob(job) {
         successCount,
         failCount: failedRows.length,
         errorFileUrl: uploadJob.errorFileUrl
-          ? `${process.env.CLIENT_URL || 'http://localhost:5000'}${uploadJob.errorFileUrl}`
+          ? `${downloadBaseUrl}${uploadJob.errorFileUrl}`
           : null,
       });
     }

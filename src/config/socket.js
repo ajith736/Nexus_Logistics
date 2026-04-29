@@ -1,12 +1,14 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const { getAllowedOrigins } = require('./origins');
 
 let io = null;
 
 function initSocket(httpServer) {
+  const allowedOrigins = getAllowedOrigins();
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || '*',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
     },
   });
