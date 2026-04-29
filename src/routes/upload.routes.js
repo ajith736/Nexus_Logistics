@@ -23,6 +23,7 @@ router.use(verifyToken);
  *       - Uploads
  *     summary: Upload CSV for bulk order import (dispatcher)
  *     description: |
+ *       Click **Authorize** in Swagger UI first and paste the dispatcher accessToken.
  *       Send a CSV file as multipart/form-data with field name **file** (max 10 MB).
  *       Requires Redis. The file is queued for background processing — response is 202 immediately.
  *       Listen to socket events `upload:progress` and `upload:complete` for live updates.
@@ -122,6 +123,45 @@ router.get('/', requireRole(ROLES.DISPATCHER), listUploads);
 
 /**
  * @swagger
+ * /api/uploads/{id}/error-url:
+ *   get:
+ *     tags:
+ *       - Uploads
+ *     summary: Get a fresh error CSV download URL (dispatcher)
+ *     description: |
+ *       Use this for S3-backed error CSVs because signed URLs expire.
+ *       Requires dispatcher bearer token via the Swagger Authorize button.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: UploadJob MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Fresh download URL generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     url:
+ *                       type: string
+ *       404:
+ *         description: Upload job or error CSV not found
+ */
+router.get('/:id/error-url', requireRole(ROLES.DISPATCHER), getUploadErrorUrl);
+
+/**
+ * @swagger
  * /api/uploads/{id}:
  *   get:
  *     tags:
@@ -168,7 +208,6 @@ router.get('/', requireRole(ROLES.DISPATCHER), listUploads);
  *       404:
  *         description: Upload job not found
  */
-router.get('/:id/error-url', requireRole(ROLES.DISPATCHER), getUploadErrorUrl);
 router.get('/:id', requireRole(ROLES.DISPATCHER), getUpload);
 
 module.exports = router;

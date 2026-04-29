@@ -14,6 +14,7 @@ const router = Router();
  *     tags:
  *       - Auth
  *     summary: Dispatcher / superadmin login
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -75,6 +76,7 @@ router.post('/login', authLimiter, validate(loginSchema), login);
  *       - Auth
  *     summary: Refresh access token (users only — not agents)
  *     description: Provide a valid refreshToken to receive a new accessToken. Detects and blocks token reuse.
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -101,6 +103,7 @@ router.post('/refresh', authLimiter, validate(refreshTokenSchema), refreshAccess
  *       - Auth
  *     summary: Agent login via phone + 4-digit PIN
  *     description: Agents do not receive a refreshToken — only a short-lived accessToken.
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
