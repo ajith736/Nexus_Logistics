@@ -1,11 +1,17 @@
 const nodemailer = require('nodemailer');
+const { MailtrapClient } = require('mailtrap');
 
 let transporter = null;
+let mailtrapClient = null;
 
 function isMailConfigured() {
   return Boolean(
     String(process.env.MAIL_USER || '').trim() && String(process.env.MAIL_PASS || '').trim()
   );
+}
+
+function isMailtrapApiConfigured() {
+  return Boolean(String(process.env.MAILTRAP_API_TOKEN || '').trim());
 }
 
 function getMailTransporter() {
@@ -23,4 +29,17 @@ function getMailTransporter() {
   return transporter;
 }
 
-module.exports = { getMailTransporter, isMailConfigured };
+function getMailtrapClient() {
+  if (mailtrapClient) return mailtrapClient;
+  mailtrapClient = new MailtrapClient({
+    token: process.env.MAILTRAP_API_TOKEN || '',
+  });
+  return mailtrapClient;
+}
+
+module.exports = {
+  getMailTransporter,
+  isMailConfigured,
+  getMailtrapClient,
+  isMailtrapApiConfigured,
+};

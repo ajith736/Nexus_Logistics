@@ -33,7 +33,7 @@ npm install
 
 ### Environment Variables
 
-Copy `.env.example` or create `.env` in the project root:
+Copy `.env.example` to `.env` for local development:
 
 ```env
 PORT=5000
@@ -59,6 +59,13 @@ CLIENT_URL=http://localhost:3000
 
 Set `REDIS_ENABLED=false` to run without Redis (bulk uploads will be disabled).
 
+For production deployment, start from `.env.production.example` and fill real values.
+Important production keys:
+
+- `PUBLIC_API_URL`: external backend URL used in email links.
+- `CORS_ALLOWED_ORIGINS`: comma-separated frontend origins allowed by API and socket CORS.
+- `REDIS_PASSWORD` / `REDIS_TLS`: required for managed Redis providers.
+
 ### Seed SuperAdmin
 
 ```bash
@@ -78,6 +85,21 @@ npm start
 ```
 
 Server starts on `http://localhost:5000` (or the configured `PORT`).
+
+### PM2 (Production Process Manager)
+
+```bash
+# Start in production mode
+npm run start:pm2
+
+# View process + logs
+pm2 ls
+npm run logs:pm2
+
+# Persist process list across reboot
+pm2 save
+pm2 startup
+```
 
 ---
 
