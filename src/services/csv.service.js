@@ -1,5 +1,6 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
+const { Readable } = require('stream');
 const { parse } = require('csv-parse');
 
 const REQUIRED_COLUMNS = ['saleOrderId', 'customerName', 'customerPhone', 'customerAddress'];
@@ -25,10 +26,10 @@ function normaliseHeader(raw) {
  * Parses a CSV file into an array of row objects.
  * Returns { rows, headers } where rows[i] = { saleOrderId, customerName, ... }
  */
-function parseCSV(filePath) {
+function parseCSVStream(inputStream) {
   return new Promise((resolve, reject) => {
     const rows = [];
-    const stream = fs.createReadStream(filePath).pipe(
+    const stream = inputStream.pipe(
       parse({
         columns: (headers) => headers.map(normaliseHeader),
         skip_empty_lines: true,
@@ -41,6 +42,14 @@ function parseCSV(filePath) {
     stream.on('error', reject);
     stream.on('end', () => resolve(rows));
   });
+}
+
+function parseCSV(filePath) {
+  return parseCSVStream(fs.createReadStream(filePath));
+}
+
+function parseCSVBuffer(buffer) {
+  return parseCSVStream(Readable.from(buffer));
 }
 
 /**
@@ -74,6 +83,11 @@ function validateRow(row) {
  * Each entry in failedRows: { row: { ...csvFields }, reason: string, rowNumber: number }
  */
 async function generateErrorCSV(failedRows, outputPath) {
+  const body = buildErrorCSV(failedRows);
+  await fsp.writeFile(outputPath, body, 'utf-8');
+}
+
+function buildErrorCSV(failedRows) {
   const header = ['rowNumber', ...ALL_COLUMNS, 'errorReason'];
   const lines = [header.join(',')];
 
@@ -86,7 +100,7 @@ async function generateErrorCSV(failedRows, outputPath) {
     lines.push(values.join(','));
   }
 
-  await fsp.writeFile(outputPath, lines.join('\n'), 'utf-8');
+  return lines.join('\n');
 }
 
 function escapeCSV(value) {
@@ -119,8 +133,10 @@ function getSampleUploadCsv() {
 
 module.exports = {
   parseCSV,
+  parseCSVBuffer,
   validateRow,
   generateErrorCSV,
+  buildErrorCSV,
   getSampleUploadCsv,
   SAMPLE_CSV_FILE_NAME,
   REQUIRED_COLUMNS,

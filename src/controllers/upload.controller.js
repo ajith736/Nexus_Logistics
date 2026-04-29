@@ -2,7 +2,7 @@ const path = require('path');
 const multer = require('multer');
 const UploadJob = require('../models/UploadJob');
 const { getUploadQueue } = require('../queues/upload.queue');
-const { UPLOADS_DIR } = require('../services/storage.service');
+const { UPLOADS_DIR, saveUploadFile, getSignedDownloadUrl } = require('../services/storage.service');
 const { success, error, paginated } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
 const { isRedisEnabled } = require('../config/redis');
@@ -61,16 +61,22 @@ async function uploadCSV(req, res, next) {
       return error(res, 'No CSV file provided. Send a file with field name "file".', 400, 'NO_FILE');
     }
 
+    const storedFile = await saveUploadFile(req.file, { orgId: String(req.user.orgId) });
+
     const uploadJob = await UploadJob.create({
-      fileName: req.file.filename,
+      fileName: storedFile.fileName || req.file.filename,
       originalName: req.file.originalname,
+      storageProvider: storedFile.provider,
+      fileKey: storedFile.objectKey || storedFile.filePath || req.file.path,
       orgId: req.user.orgId,
       uploadedBy: req.user.id,
     });
 
     await queue.add('process-csv', {
       uploadJobId: String(uploadJob._id),
-      filePath: req.file.path,
+      storageProvider: storedFile.provider,
+      filePath: storedFile.filePath,
+      fileKey: storedFile.objectKey,
       orgId: String(req.user.orgId),
       uploadedBy: String(req.user.id),
     });
@@ -118,4 +124,35 @@ async function getUpload(req, res, next) {
   }
 }
 
-module.exports = { uploadMiddleware, downloadSampleCsv, uploadCSV, listUploads, getUpload };
+async function getUploadErrorUrl(req, res, next) {
+  try {
+    const uploadJob = await UploadJob.findOne({
+      _id: req.params.id,
+      orgId: req.user.orgId,
+    });
+
+    if (!uploadJob) return error(res, 'Upload job not found', 404, 'NOT_FOUND');
+    if (!uploadJob.errorFileUrl && !uploadJob.errorFileKey) {
+      return error(res, 'No error CSV is available for this upload', 404, 'ERROR_FILE_NOT_FOUND');
+    }
+
+    if (uploadJob.storageProvider === 's3' && uploadJob.errorFileKey) {
+      const url = await getSignedDownloadUrl(uploadJob.errorFileKey);
+      return success(res, { url }, 'Signed error CSV URL generated');
+    }
+
+    const baseUrl = (process.env.PUBLIC_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
+    return success(res, { url: `${baseUrl}${uploadJob.errorFileUrl}` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  uploadMiddleware,
+  downloadSampleCsv,
+  uploadCSV,
+  listUploads,
+  getUpload,
+  getUploadErrorUrl,
+};

@@ -1,7 +1,13 @@
 const { Worker } = require('bullmq');
 const { getRedisConnection, isRedisEnabled } = require('../config/redis');
-const { parseCSV, validateRow, generateErrorCSV } = require('../services/csv.service');
-const { getAbsolutePath, getFileUrl } = require('../services/storage.service');
+const { parseCSV, parseCSVBuffer, validateRow, buildErrorCSV, generateErrorCSV } = require('../services/csv.service');
+const {
+  getAbsolutePath,
+  getFileUrl,
+  readObjectBuffer,
+  saveErrorReport,
+  getSignedDownloadUrl,
+} = require('../services/storage.service');
 const { sendUploadReport } = require('../services/email.service');
 const { emitToOrg } = require('../config/socket');
 const Order = require('../models/Order');
@@ -15,7 +21,7 @@ const { QUEUE_NAME } = require('./upload.queue');
 const PROGRESS_INTERVAL = 50;
 
 async function processUploadJob(job) {
-  const { uploadJobId, filePath, orgId, uploadedBy } = job.data;
+  const { uploadJobId, filePath, fileKey, storageProvider, orgId, uploadedBy } = job.data;
 
   const uploadJob = await UploadJob.findById(uploadJobId);
   if (!uploadJob) throw new Error(`UploadJob ${uploadJobId} not found`);
@@ -25,7 +31,12 @@ async function processUploadJob(job) {
 
   let rows;
   try {
-    rows = await parseCSV(filePath);
+    if (storageProvider === 's3' || uploadJob.storageProvider === 's3') {
+      const csvBuffer = await readObjectBuffer(fileKey || uploadJob.fileKey);
+      rows = await parseCSVBuffer(csvBuffer);
+    } else {
+      rows = await parseCSV(filePath || uploadJob.fileKey);
+    }
   } catch (err) {
     uploadJob.status = UPLOAD_STATUSES.FAILED;
     uploadJob.completedAt = new Date();
@@ -107,9 +118,16 @@ async function processUploadJob(job) {
 
   if (failedRows.length > 0) {
     const errorFileName = `errors-${uploadJobId}-${Date.now()}.csv`;
-    const errorFilePath = getAbsolutePath(errorFileName);
-    await generateErrorCSV(failedRows, errorFilePath);
-    uploadJob.errorFileUrl = getFileUrl(errorFileName);
+    if (uploadJob.storageProvider === 's3') {
+      const errorCsv = Buffer.from(buildErrorCSV(failedRows), 'utf8');
+      const savedError = await saveErrorReport(errorCsv, { orgId, fileName: errorFileName });
+      uploadJob.errorFileKey = savedError.objectKey;
+      uploadJob.errorFileUrl = savedError.url;
+    } else {
+      const errorFilePath = getAbsolutePath(errorFileName);
+      await generateErrorCSV(failedRows, errorFilePath);
+      uploadJob.errorFileUrl = getFileUrl(errorFileName);
+    }
   }
 
   await uploadJob.save();
@@ -136,9 +154,7 @@ async function processUploadJob(job) {
         totalRows: rows.length,
         successCount,
         failCount: failedRows.length,
-        errorFileUrl: uploadJob.errorFileUrl
-          ? `${downloadBaseUrl}${uploadJob.errorFileUrl}`
-          : null,
+        errorFileUrl: await resolveErrorFileUrl(uploadJob, downloadBaseUrl),
       });
     }
   } catch {
@@ -146,6 +162,14 @@ async function processUploadJob(job) {
   }
 
   return { successCount, failCount: failedRows.length };
+}
+
+async function resolveErrorFileUrl(uploadJob, downloadBaseUrl) {
+  if (!uploadJob.errorFileUrl && !uploadJob.errorFileKey) return null;
+  if (uploadJob.storageProvider === 's3' && uploadJob.errorFileKey) {
+    return getSignedDownloadUrl(uploadJob.errorFileKey);
+  }
+  return `${downloadBaseUrl}${uploadJob.errorFileUrl}`;
 }
 
 let worker = null;

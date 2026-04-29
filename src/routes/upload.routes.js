@@ -1,7 +1,14 @@
 const { Router } = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { uploadCsvLimiter } = require('../middleware/rateLimiter');
-const { uploadMiddleware, downloadSampleCsv, uploadCSV, listUploads, getUpload } = require('../controllers/upload.controller');
+const {
+  uploadMiddleware,
+  downloadSampleCsv,
+  uploadCSV,
+  listUploads,
+  getUpload,
+  getUploadErrorUrl,
+} = require('../controllers/upload.controller');
 const { ROLES } = require('../utils/constants');
 
 const router = Router();
@@ -161,6 +168,7 @@ router.get('/', requireRole(ROLES.DISPATCHER), listUploads);
  *       404:
  *         description: Upload job not found
  */
+router.get('/:id/error-url', requireRole(ROLES.DISPATCHER), getUploadErrorUrl);
 router.get('/:id', requireRole(ROLES.DISPATCHER), getUpload);
 
 module.exports = router;
