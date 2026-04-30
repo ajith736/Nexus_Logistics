@@ -58,10 +58,10 @@ export default function UploadsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['uploads'],
-    queryFn: () => uploadsApi.list({ page: 1, limit: 50 }).then((r) => r.data.data),
+    queryFn: () => uploadsApi.list({ page: 1, limit: 50 }).then((r) => r.data),
   });
 
-  const uploads = data?.docs ?? [];
+  const uploads = data?.data ?? [];
 
   const uploadMutation = useMutation({
     mutationFn: (file) =>
@@ -127,6 +127,47 @@ export default function UploadsPage() {
 
   useSocket('upload:progress', handleProgress);
   useSocket('upload:complete', handleComplete);
+
+  // Socket events give instant feedback, but polling makes the UI resilient if
+  // a completion event is missed while the app is reconnecting.
+  useEffect(() => {
+    if (!activeJob?.jobId || activeJob.status !== 'processing') return undefined;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await uploadsApi.get(activeJob.jobId);
+        const job = res?.data?.data;
+        if (!job) return;
+
+        if (job.totalRows) {
+          const pct = Math.round(((job.successCount + job.failCount) / job.totalRows) * 100);
+          setActiveJob((prev) => (prev ? { ...prev, processingProgress: pct } : prev));
+        }
+
+        if (job.status === 'completed' || job.status === 'failed') {
+          setActiveJob((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  processingProgress: 100,
+                  status: job.status === 'completed' ? 'complete' : 'error',
+                  successCount: job.successCount,
+                  failCount: job.failCount,
+                  errorFileUrl: job.errorFileUrl,
+                  errorFileKey: job.errorFileKey,
+                }
+              : prev
+          );
+          queryClient.invalidateQueries({ queryKey: ['uploads'] });
+          clearInterval(timer);
+        }
+      } catch {
+        /* Keep socket-driven UI primary; polling is just a fallback. */
+      }
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [activeJob?.jobId, activeJob?.status, queryClient]);
 
   const openErrorReport = useCallback(async (jobId) => {
     if (!jobId) return;
