@@ -1,17 +1,15 @@
 import { io } from 'socket.io-client';
 
 let socket = null;
-const SOCKET_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/+$/, '')
-  : window.location.origin;
 
 export function connectSocket(token) {
   if (socket) {
     socket.disconnect();
   }
-  socket = io(SOCKET_URL, {
+  socket = io(window.location.origin, {
     auth: { token },
-    transports: ['websocket', 'polling'],
+    // Vercel rewrites reliably proxy HTTP polling to the EC2 backend.
+    transports: ['polling'],
   });
   return socket;
 }

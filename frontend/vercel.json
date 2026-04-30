@@ -9,10 +9,6 @@
       "destination": "http://13.205.161.54/socket.io/:path*"
     },
     {
-      "source": "/uploads/:path*",
-      "destination": "http://13.205.161.54/uploads/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
