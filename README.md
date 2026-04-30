@@ -13,7 +13,29 @@ Multi-tenant logistics/delivery management API built with Node.js, Express 5, Mo
 | Email | Nodemailer + Mailtrap |
 | Auth | JWT access/refresh tokens + bcryptjs |
 | Validation | Joi |
-| File Storage | Local disk (`uploads/`) with abstraction layer |
+| File Storage | AWS S3 for production CSV/error reports, local disk fallback for development |
+
+## Live Demo & Deployment
+
+This project has been deployed end-to-end with a production-style architecture:
+
+- **Frontend:** Vercel
+- **Backend:** AWS EC2 running Node.js with PM2 behind Nginx
+- **Queue:** Redis + BullMQ for CSV upload processing
+- **Database:** MongoDB Atlas
+- **File Storage:** AWS S3 for uploaded CSV files and generated error reports
+- **Email:** Mailtrap API for upload completion/failure reports
+- **API Docs:** Swagger/OpenAPI at `/api/docs`
+
+To avoid unnecessary AWS free-tier usage, the EC2 backend may be stopped when the project is not being actively demoed. The deployment is demo-ready and can be started on request for interviews or walkthroughs.
+
+When running, the app supports:
+
+- JWT-based login for superadmin, dispatcher, and agent roles
+- CSV bulk order upload with real-time progress updates
+- S3-backed error CSV report generation and signed download links
+- Email notifications after upload completion
+- Health monitoring for MongoDB, Redis, and queue depth
 
 ## Getting Started
 
