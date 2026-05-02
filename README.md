@@ -73,8 +73,12 @@ MAIL_PORT=2525
 MAIL_USER=your_mailtrap_user
 MAIL_PASS=your_mailtrap_pass
 
-SUPERADMIN_EMAIL=superadmin@nexus.io
-SUPERADMIN_PASSWORD=Admin@1234
+STORAGE_PROVIDER= local|| s3
+AWS_REGION= aws_region
+S3_BUCKET= s3_bucket_name
+S3_UPLOAD_PREFIX= upload_folder_name
+S3_ERROR_PREFIX= errored_folder_name
+S3_SIGNED_URL_TTL_SECONDS=900
 
 CLIENT_URL=http://localhost:3000
 ```
