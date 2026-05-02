@@ -87,7 +87,56 @@ The project includes production-oriented setup for environment variables, proces
 
 ```bash
 npm install
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` for local development:
+
+```env
+PORT=5000
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/nexus_logistics
+
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+
+REDIS_ENABLED=true
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USER=your_mailtrap_user
+MAIL_PASS=your_mailtrap_pass
+
+STORAGE_PROVIDER= local|| s3
+AWS_REGION= aws_region
+S3_BUCKET= s3_bucket_name
+S3_UPLOAD_PREFIX= upload_folder_name
+S3_ERROR_PREFIX= errored_folder_name
+S3_SIGNED_URL_TTL_SECONDS=900
+
+CLIENT_URL=http://localhost:3000
+```
+
+Set `REDIS_ENABLED=false` to run without Redis (bulk uploads will be disabled).
+
+For production deployment, start from `.env.production.example` and fill real values.
+Important production keys:
+
+- `PUBLIC_API_URL`: external backend URL used in email links.
+- `CORS_ALLOWED_ORIGINS`: comma-separated frontend origins allowed by API and socket CORS.
+- `REDIS_PASSWORD` / `REDIS_TLS`: required for managed Redis providers.
+
+### Seed SuperAdmin
+
+```bash
 npm run seed
+```
+
+### Run Backend
+
+```bash
 npm run dev
 ```
 
