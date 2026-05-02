@@ -27,27 +27,14 @@ This project demonstrates practical backend and frontend engineering beyond basi
 
 ## UI Screenshots
 
-Add your UI screenshots in:
-
-```text
-docs/screenshots/
-```
-
-Suggested images to include:
-
 - Login screen
+- <img width="1649" height="787" alt="image" src="https://github.com/user-attachments/assets/6a349520-8fae-4f39-b454-1ee0d8a39dba" />
+
 - Super Admin dashboard
 - Dispatcher order dashboard
 - Bulk upload flow
 - Upload result/error report screen
 - Agent order status screen
-
-After adding screenshots, update this section like this:
-
-```md
-![Dashboard](docs/screenshots/dashboard.png)
-![Bulk Upload](docs/screenshots/bulk-upload.png)
-```
 
 ## Tech Stack
 
