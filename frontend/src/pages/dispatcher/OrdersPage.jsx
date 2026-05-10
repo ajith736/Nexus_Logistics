@@ -98,11 +98,29 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       setSelectedIds([]);
       setBulkAgentId('');
-      const count = res?.data?.data?.count ?? selectedIds.length;
-      toast.success(`${count} order${count !== 1 ? 's' : ''} assigned successfully.`);
+      const responseData = res?.data?.data;
+      const count = responseData?.count ?? selectedIds.length;
+      const conflictCount = responseData?.conflicts?.length ?? 0;
+
+      if (conflictCount > 0) {
+        toast.error(
+          `${count} assigned, ${conflictCount} already assigned by another dispatcher.`
+        );
+      } else {
+        toast.success(`${count} order${count !== 1 ? 's' : ''} assigned successfully.`);
+      }
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Bulk assign failed.');
+      const data = err?.response?.data;
+      const isConflict = err?.response?.status === 409 || data?.errorCode === 'ASSIGNMENT_CONFLICT';
+      if (isConflict) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        setSelectedIds([]);
+        setBulkAgentId('');
+        toast.error(data?.message || 'All selected orders were already assigned by another dispatcher.');
+      } else {
+        toast.error(data?.message || 'Bulk assign failed.');
+      }
     },
   });
 

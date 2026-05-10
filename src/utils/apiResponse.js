@@ -4,9 +4,10 @@ function success(res, data = null, message = 'Success', statusCode = 200) {
   return res.status(statusCode).json(payload);
 }
 
-function error(res, message = 'Internal Server Error', statusCode = 500, errorCode = null) {
+function error(res, message = 'Internal Server Error', statusCode = 500, errorCode = null, details = null) {
   const payload = { success: false, message };
   if (errorCode) payload.errorCode = errorCode;
+  if (details) payload.details = details;
   return res.status(statusCode).json(payload);
 }
 

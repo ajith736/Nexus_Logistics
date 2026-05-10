@@ -13,7 +13,11 @@ export const ordersApi = {
 
   update: (id, data) => api.patch(`/orders/${id}`, data),
 
-  assign: (id, agentId) => api.patch(`/orders/${id}/assign`, { agentId }),
+  assign: (id, agentId, version) =>
+    api.patch(`/orders/${id}/assign`, {
+      agentId,
+      ...(version !== undefined && { version }),
+    }),
 
   updateStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
 

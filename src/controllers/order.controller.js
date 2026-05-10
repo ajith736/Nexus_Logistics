@@ -45,26 +45,73 @@ function buildCreatedAtRangeFilter(query) {
   return Object.keys(range).length ? range : null;
 }
 
-async function runAssignOrderToAgent({ order, agent, orgId, userId }) {
-  const previousStatus = order.status;
-  order.assignedTo = agent._id;
-  order.status = ORDER_STATUSES.ASSIGNED;
-  await order.save();
+/**
+ * Atomically assigns an agent to an order using optimistic locking.
+ *
+ * The update is conditioned on:
+ *   - correct orgId          (tenant safety)
+ *   - status still assignable (no state drift)
+ *   - version matches client  (no concurrent winner already wrote)
+ *
+ * Returns { ok: true, order } on success.
+ * Returns { ok: false, conflict: { assignedAgentName, assignedAgentPhone } } when
+ * another request already claimed the order.
+ */
+async function runAssignOrderToAgent({ orderId, previousStatus, clientVersion, agent, orgId, userId }) {
+  const ASSIGNABLE = [ORDER_STATUSES.CREATED, ORDER_STATUSES.PENDING, ORDER_STATUSES.FAILED];
+
+  const updated = await Order.findOneAndUpdate(
+    {
+      _id: orderId,
+      orgId,
+      status: { $in: ASSIGNABLE },
+      version: clientVersion,
+    },
+    {
+      $set: {
+        assignedTo: agent._id,
+        assignedBy: userId,
+        status: ORDER_STATUSES.ASSIGNED,
+      },
+      $inc: { version: 1 },
+    },
+    { new: true }
+  )
+    .populate('assignedTo', 'name phone')
+    .populate('assignedBy', 'name email');
+
+  // No document matched — either version mismatch (race lost) or status changed.
+  // Read current state to build a meaningful conflict response.
+  if (!updated) {
+    const current = await Order.findOne({ _id: orderId, orgId })
+      .populate('assignedTo', 'name phone')
+      .populate('assignedBy', 'name email')
+      .lean();
+    return {
+      ok: false,
+      conflict: {
+        assignedAgentName: current?.assignedTo?.name || null,
+        assignedAgentPhone: current?.assignedTo?.phone || null,
+        assignedByName: current?.assignedBy?.name || null,
+        assignedByEmail: current?.assignedBy?.email || null,
+        currentStatus: current?.status || null,
+      },
+    };
+  }
 
   await OrderStatusLog.create({
-    orderId: order._id,
+    orderId: updated._id,
     fromStatus: previousStatus,
     toStatus: ORDER_STATUSES.ASSIGNED,
     changedBy: userId,
     changedByModel: 'User',
   });
 
-  const populated = await Order.findById(order._id).populate('assignedTo', 'name phone');
-
   emitToOrg(orgId, 'order:statusChanged', {
-    orderId: order.orderId,
+    orderId: updated.orderId,
     newStatus: ORDER_STATUSES.ASSIGNED,
     agentName: agent.name,
+    assignedByName: updated.assignedBy?.name || null,
   });
 
   logAudit({
@@ -72,10 +119,15 @@ async function runAssignOrderToAgent({ order, agent, orgId, userId }) {
     performedBy: userId,
     performedByModel: 'User',
     orgId,
-    metadata: { orderId: order.orderId, agentId: String(agent._id), agentName: agent.name },
+    metadata: {
+      orderId: updated.orderId,
+      agentId: String(agent._id),
+      agentName: agent.name,
+      assignedByUserId: String(userId),
+    },
   });
 
-  return populated;
+  return { ok: true, order: updated };
 }
 
 async function createOrder(req, res, next) {
@@ -143,6 +195,7 @@ async function listOrders(req, res, next) {
     const [docs, total] = await Promise.all([
       Order.find(filter)
         .populate('assignedTo', 'name phone')
+        .populate('assignedBy', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -191,7 +244,9 @@ async function getOrder(req, res, next) {
       filter.assignedTo = req.user.id;
     }
 
-    const order = await Order.findOne(filter).populate('assignedTo', 'name phone');
+    const order = await Order.findOne(filter)
+      .populate('assignedTo', 'name phone')
+      .populate('assignedBy', 'name email');
 
     if (!order) return error(res, 'Order not found', 404, 'NOT_FOUND');
 
@@ -206,8 +261,9 @@ async function getOrder(req, res, next) {
 async function assignAgent(req, res, next) {
   try {
     const orgId = req.user.orgId;
-    const { agentId } = req.body;
+    const { agentId, version } = req.body;
 
+    // Read current order to validate status and capture previousStatus for the log.
     const order = await Order.findOne({ _id: req.params.id, orgId });
     if (!order) return error(res, 'Order not found', 404, 'NOT_FOUND');
 
@@ -224,14 +280,37 @@ async function assignAgent(req, res, next) {
     const agent = await Agent.findOne({ _id: agentId, orgId });
     if (!agent) return error(res, 'Agent not found in your organization', 404, 'AGENT_NOT_FOUND');
 
-    const populated = await runAssignOrderToAgent({
-      order,
+    // Use the client-supplied version when provided; fall back to the DB version.
+    // Coerce to a number — order.version can be undefined on pre-migration docs,
+    // in which case we treat it as 0 (migration will have already fixed most of these).
+    const clientVersion = version !== undefined ? Number(version) : (order.version ?? 0);
+
+    const result = await runAssignOrderToAgent({
+      orderId: order._id,
+      previousStatus: order.status,
+      clientVersion,
       agent,
       orgId,
       userId: req.user.id,
     });
 
-    return success(res, populated, 'Agent assigned to order');
+    if (!result.ok) {
+      return error(
+        res,
+        'Order was already assigned by another dispatcher',
+        409,
+        'ASSIGNMENT_CONFLICT',
+        {
+          assignedAgentName: result.conflict.assignedAgentName,
+          assignedAgentPhone: result.conflict.assignedAgentPhone,
+          assignedByName: result.conflict.assignedByName,
+          assignedByEmail: result.conflict.assignedByEmail,
+          currentStatus: result.conflict.currentStatus,
+        }
+      );
+    }
+
+    return success(res, result.order, 'Agent assigned to order');
   } catch (err) {
     next(err);
   }
@@ -261,19 +340,48 @@ async function bulkAssignAgent(req, res, next) {
       );
     }
 
-    const results = [];
+    const succeeded = [];
+    const conflicts = [];
+
     for (const order of orders) {
       // eslint-disable-next-line no-await-in-loop
-      const populated = await runAssignOrderToAgent({
-        order,
+      const result = await runAssignOrderToAgent({
+        orderId: order._id,
+        previousStatus: order.status,
+        clientVersion: order.version ?? 0,
         agent,
         orgId,
         userId: req.user.id,
       });
-      results.push(populated);
+
+      if (result.ok) {
+        succeeded.push(result.order);
+      } else {
+        conflicts.push({
+          orderId: order.orderId,
+          ...result.conflict,
+        });
+      }
     }
 
-    return success(res, { count: results.length, orders: results }, 'Orders assigned to agent');
+    // If every order lost the race, treat the whole operation as a conflict.
+    if (succeeded.length === 0 && conflicts.length > 0) {
+      return error(
+        res,
+        'All selected orders were already assigned by another dispatcher',
+        409,
+        'ASSIGNMENT_CONFLICT',
+        { conflicts }
+      );
+    }
+
+    return success(
+      res,
+      { count: succeeded.length, orders: succeeded, conflicts },
+      conflicts.length > 0
+        ? `${succeeded.length} orders assigned; ${conflicts.length} already assigned by another dispatcher`
+        : 'Orders assigned to agent'
+    );
   } catch (err) {
     next(err);
   }

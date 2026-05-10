@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/store/toast.store';
@@ -79,6 +79,7 @@ export default function OrderDetailPage() {
   const toast = useToast();
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [pendingStatus, setPendingStatus] = useState('');
+  const [conflictBanner, setConflictBanner] = useState(null); // { agentName, agentPhone }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['order', id],
@@ -94,6 +95,13 @@ export default function OrderDetailPage() {
   const statusLogs = order?.statusLogs || [];
   const allAgents = agentsData?.data?.data || [];
 
+  // Clear conflict banner once the order refreshes and is no longer in an assignable state.
+  useEffect(() => {
+    if (conflictBanner && order && !['created', 'pending', 'failed'].includes(order.status)) {
+      setConflictBanner(null);
+    }
+  }, [order?.status, conflictBanner]);
+
   const invalidateOrder = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['order', id] });
     queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -102,14 +110,35 @@ export default function OrderDetailPage() {
   useSocket('order:statusChanged', invalidateOrder);
 
   const assignMutation = useMutation({
-    mutationFn: () => ordersApi.assign(id, selectedAgentId),
+    mutationFn: () => ordersApi.assign(id, selectedAgentId, order?.version),
     onSuccess: () => {
       invalidateOrder();
       setSelectedAgentId('');
       toast.success('Agent assigned successfully.');
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Failed to assign agent.');
+      const data = err?.response?.data;
+      const isConflict = err?.response?.status === 409 || data?.errorCode === 'ASSIGNMENT_CONFLICT';
+
+      if (isConflict) {
+        const agentName = data?.details?.assignedAgentName;
+        const agentPhone = data?.details?.assignedAgentPhone;
+        const dispatcherName = data?.details?.assignedByName;
+        const dispatcherEmail = data?.details?.assignedByEmail;
+        const conflictMsg =
+          agentName && dispatcherName
+            ? `Order was already assigned to ${agentName} by ${dispatcherName}.`
+            : agentName
+            ? `Order was already assigned to ${agentName} by another dispatcher.`
+            : 'Order was already assigned by another dispatcher.';
+        toast.error(conflictMsg);
+        setConflictBanner({ agentName, agentPhone, dispatcherName, dispatcherEmail });
+        // Refresh so dispatcher immediately sees the real current state.
+        invalidateOrder();
+        setSelectedAgentId('');
+      } else {
+        toast.error(data?.message || 'Failed to assign agent.');
+      }
     },
   });
 
@@ -177,6 +206,47 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
+          {/* Conflict banner — shown when this dispatcher lost an assignment race */}
+          {conflictBanner && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+              <div className="mt-0.5 h-4 w-4 shrink-0 text-red-500">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-11.25a.75.75 0 011.5 0v4.5a.75.75 0 01-1.5 0v-4.5zm.75 7.5a.75.75 0 110-1.5.75.75 0 010 1.5z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-red-800">Assignment conflict</p>
+                <p className="text-sm text-red-700 mt-0.5">
+                  Another dispatcher assigned this order first.
+                  {conflictBanner.agentName && (
+                    <>
+                      {' '}
+                      Delivery agent: <strong>{conflictBanner.agentName}</strong>
+                      {conflictBanner.agentPhone && <> ({conflictBanner.agentPhone})</>}.
+                    </>
+                  )}
+                  {conflictBanner.dispatcherName && (
+                    <>
+                      {' '}
+                      Assigned by: <strong>{conflictBanner.dispatcherName}</strong>
+                      {conflictBanner.dispatcherEmail && (
+                        <> ({conflictBanner.dispatcherEmail})</>
+                      )}.
+                    </>
+                  )}
+                </p>
+                <p className="text-xs text-red-500 mt-1">The page has been refreshed to show the latest state.</p>
+              </div>
+              <button
+                onClick={() => setConflictBanner(null)}
+                className="text-red-400 hover:text-red-600 text-lg leading-none shrink-0"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {/* Assigned Agent */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
@@ -195,6 +265,15 @@ export default function OrderDetailPage() {
                 <div>
                   <p className="font-medium text-gray-900">{order.assignedTo.name}</p>
                   <p className="text-sm text-gray-400">{order.assignedTo.phone}</p>
+                  {order.assignedBy && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Assigned by{' '}
+                      <span className="font-medium text-gray-700">{order.assignedBy.name}</span>
+                      {order.assignedBy.email && (
+                        <span className="text-gray-400"> ({order.assignedBy.email})</span>
+                      )}
+                    </p>
+                  )}
                   {order.status === 'failed' && (
                     <p className="text-xs text-gray-400 italic mt-0.5">Previously assigned</p>
                   )}

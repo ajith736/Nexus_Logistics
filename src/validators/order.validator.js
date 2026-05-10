@@ -11,6 +11,10 @@ const createOrderSchema = Joi.object({
 
 const assignAgentSchema = Joi.object({
   agentId: Joi.string().hex().length(24).required(),
+  // Client supplies the order version it last read for optimistic locking.
+  // If omitted the server falls back to the current DB version (safe for
+  // single-dispatcher flows but provides no race protection).
+  version: Joi.number().integer().min(0).optional(),
 });
 
 const updateOrderStatusSchema = Joi.object({

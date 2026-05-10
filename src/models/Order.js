@@ -42,6 +42,12 @@ const orderSchema = new mongoose.Schema(
       ref: 'Agent',
       default: null,
     },
+    /** Dispatcher (User) who last assigned this order to an agent. */
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     orgId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
@@ -55,6 +61,12 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Optimistic locking: incremented on every assignment so concurrent
+// assign requests with a stale version are rejected with 409.
+orderSchema.add({
+  version: { type: Number, default: 0 },
+});
 
 orderSchema.index({ orgId: 1, saleOrderId: 1 }, { unique: true });
 orderSchema.index({ orgId: 1, status: 1 });
